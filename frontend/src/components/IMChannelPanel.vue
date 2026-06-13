@@ -10,6 +10,12 @@
       <t-loading :loading="loading" size="small" class="channels-loading-wrap">
         <div v-if="!loading && channels.length === 0 && !authStore.hasRole('admin')" class="channels-empty">
           <t-empty :description="$t('agentEditor.im.empty')" />
+          <div v-if="authStore.hasRole('admin')" class="channels-empty-action">
+            <t-button theme="default" variant="outline" @click="openCreate">
+              <template #icon><t-icon name="add" /></template>
+              {{ $t('agentEditor.im.addChannel') }}
+            </t-button>
+          </div>
         </div>
 
         <div v-else-if="!loading" class="channel-grid">
