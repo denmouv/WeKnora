@@ -1630,6 +1630,14 @@ func (s *Service) executeQARequest(req *qaRequest) {
 		answer = "抱歉，处理您的问题时出现了异常，请稍后再试。"
 	}
 
+	// The agent may not pass [FILE:...] markers through in its final
+	// answer text, so also extract them from tool messages in the
+	// conversation history.
+	toolFileMarkers := s.extractFileMarkersFromToolMessages(ctx, req.session.ID)
+	if len(toolFileMarkers) > 0 {
+		answer = answer + "\n" + strings.Join(toolFileMarkers, "\n")
+	}
+
 	// Extract file markers ([FILE:refID:filename sizeMB]) from the agent answer
 	// and resolve them to actual file bytes from the AgentFileCache.
 	files := extractFilesFromAnswer(answer)
@@ -1690,6 +1698,27 @@ func extractFilesFromAnswer(content string) []ReplyFile {
 func stripFileMarkers(content string) string {
 	return fileMarkerPattern.ReplaceAllString(content, "")
 }
+
+// extractFileMarkersFromToolMessages scans recent session messages for
+// [FILE:...] markers produced by download_document tool results. This
+// ensures files are sent even when the agent does not pass the markers
+// through in its final answer text.
+func (s *Service) extractFileMarkersFromToolMessages(ctx context.Context, sessionID string) []string {
+	msgs, err := s.messageService.GetRecentMessagesBySession(ctx, sessionID, 20)
+	if err != nil {
+		logger.Warnf(ctx, "[IM] Failed to get recent messages for file marker extraction: %v", err)
+		return nil
+	}
+	var markers []string
+	for _, msg := range msgs {
+		if msg.Role == "tool" {
+			found := fileMarkerPattern.FindAllString(msg.Content, -1)
+			markers = append(markers, found...)
+		}
+	}
+	return markers
+}
+
 // It also handles side effects (ActionClear, ActionStop).
 func (s *Service) handleCommand(
 	ctx context.Context,
