@@ -1630,20 +1630,66 @@ func (s *Service) executeQARequest(req *qaRequest) {
 		answer = "抱歉，处理您的问题时出现了异常，请稍后再试。"
 	}
 
+	// Extract file markers ([FILE:refID:filename sizeMB]) from the agent answer
+	// and resolve them to actual file bytes from the AgentFileCache.
+	files := extractFilesFromAnswer(answer)
+	cleanAnswer := stripFileMarkers(answer)
+
 	reply := &ReplyMessage{
 		Content: formatIMOutboundAnswer(ctx, answer, req.tenant, s.defaultFileSvc, s.storageResolver),
 		IsFinal: true,
+		Files:   files,
 	}
 	if err := req.adapter.SendReply(ctx, req.msg, reply); err != nil {
 		logger.Errorf(ctx, "[IM] Send reply failed: %v", err)
 		return
 	}
 
-	logger.Infof(ctx, "[IM] Reply sent: channel=%s platform=%s user=%s answer_len=%d",
-		req.channelID, req.msg.Platform, req.msg.UserID, len(answer))
+	logger.Infof(ctx, "[IM] Reply sent: channel=%s platform=%s user=%s answer_len=%d files=%d",
+		req.channelID, req.msg.Platform, req.msg.UserID, len(answer), len(files))
 }
 
-// handleCommand executes a slash-command and sends the result back to the user.
+// fileMarkerPattern matches [FILE:refID:fileName sizeMB] markers that the
+// download_document agent tool embeds in its output.
+var fileMarkerPattern = regexp.MustCompile(`\[FILE:([\w]+):([^\]]+?\.pdf)\s+([\d.]+)MB\]`)
+
+// extractFilesFromAnswer parses [FILE:refID:filename sizeMB] markers from
+// the agent's answer and retrieves the cached file bytes.
+func extractFilesFromAnswer(content string) []ReplyFile {
+	matches := fileMarkerPattern.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	files := make([]ReplyFile, 0, len(matches))
+	for _, match := range matches {
+		refID := match[1]
+		fileName := match[2]
+		// match[3] is the size in MB — informational, already captured in the cache.
+
+		val, ok := agenttools.AgentFileCache.LoadAndDelete(refID)
+		if !ok {
+			logger.Warnf(context.Background(), "[IM] file cache miss for refID=%s", refID)
+			continue
+		}
+		fileData, ok := val.([]byte)
+		if !ok {
+			continue
+		}
+
+		files = append(files, ReplyFile{
+			FileName: fileName,
+			FileData: fileData,
+		})
+	}
+	return files
+}
+
+// stripFileMarkers removes [FILE:...] markers from the answer text for
+// clean display to IM users (the actual files are sent separately).
+func stripFileMarkers(content string) string {
+	return fileMarkerPattern.ReplaceAllString(content, "")
+}
 // It also handles side effects (ActionClear, ActionStop).
 func (s *Service) handleCommand(
 	ctx context.Context,

@@ -117,8 +117,21 @@ type ReplyMessage struct {
 	IsStreaming bool
 	// IsFinal marks the last chunk of a streaming reply.
 	IsFinal bool
+	// Files contains file attachments to send alongside the text reply.
+	// Each ReplyFile carries the raw file bytes and filename.
+	// The adapter is responsible for uploading and attaching these files
+	// according to the platform's protocol.
+	Files []ReplyFile
 	// Extra holds platform-specific fields.
 	Extra map[string]string
+}
+
+// ReplyFile represents a file attachment in an outgoing reply.
+type ReplyFile struct {
+	// FileName is the name of the file (e.g., "paper.pdf").
+	FileName string
+	// FileData is the raw file content.
+	FileData []byte
 }
 
 // Adapter is the interface every IM platform must implement.
@@ -169,4 +182,26 @@ type FileDownloader interface {
 	// DownloadFile downloads a file resource from the IM platform.
 	// Returns the file content reader, the resolved file name, and any error.
 	DownloadFile(ctx context.Context, msg *IncomingMessage) (io.ReadCloser, string, error)
+}
+
+// UploadedFileRef holds the platform-specific reference after uploading a file.
+type UploadedFileRef struct {
+	// FileName is the original file name.
+	FileName string
+	// FileSize is the original file size in bytes.
+	FileSize int64
+	// EncryptQueryParam is the iLink CDN encrypted query parameter.
+	EncryptQueryParam string
+	// AESKey is the base64-encoded AES-128 key used to encrypt the file.
+	AESKey string
+}
+
+// FileUploader is an optional interface that adapters can implement to support
+// uploading files to the IM platform. When the adapter implements this interface,
+// the IM service can send files (e.g., PDFs) directly to users.
+type FileUploader interface {
+	// UploadFile uploads a file to the IM platform's CDN.
+	// Returns a platform-specific file reference for inclusion in messages.
+	UploadFile(ctx context.Context, incoming *IncomingMessage,
+		fileName string, fileData []byte) (*UploadedFileRef, error)
 }

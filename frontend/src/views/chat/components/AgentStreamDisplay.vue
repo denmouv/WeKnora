@@ -2179,6 +2179,14 @@ const getToolSummary = (event: any): string => {
     if (toolData?.title) {
       return t('agentStream.toolSummary.getDocument', { title: toolData.title });
     }
+  } else if (toolName === 'download_document') {
+    const sizeMB = toolData?.size_bytes
+      ? (toolData.size_bytes / (1024 * 1024)).toFixed(1) + 'MB'
+      : '';
+    const title = toolData?.title || '';
+    return title
+      ? t('agentStream.toolSummary.downloadDocument', { title, size: sizeMB })
+      : t('agentStream.toolSummary.downloadDocumentDefault');
   } else if (toolName === 'list_knowledge_chunks') {
     if (toolData?.faq_question) {
       return t('agentStream.toolSummary.listFaqEntry', { question: toolData.faq_question });

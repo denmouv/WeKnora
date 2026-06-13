@@ -54,6 +54,7 @@ export const TOOL_CAPABILITY_REQUIREMENTS: Record<string, ToolRequirement> = {
   list_knowledge_chunks: { anyOf: ['vector', 'keyword'], consumesFiles: true },
   query_knowledge_graph: { anyOf: ['vector', 'keyword'], consumesFiles: true },
   get_document_info:     { anyOf: ['vector', 'keyword'], consumesFiles: true },
+  download_document:     { consumesFiles: true },
   database_query:        { anyOf: ['vector', 'keyword'], consumesFiles: true },
 
   // ---- Wiki (operates on wiki pages referenced by the wiki machinery;

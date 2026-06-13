@@ -92,14 +92,48 @@ func (a *Adapter) HandleURLVerification(c *gin.Context) bool {
 	return false
 }
 
-// SendReply sends a text reply to the user via iLink /ilink/bot/sendmessage API.
+// SendReply sends a reply to the user via iLink /ilink/bot/sendmessage API.
+// Supports both text (type=1) and file (type=4) items in a single message.
 func (a *Adapter) SendReply(ctx context.Context, incoming *im.IncomingMessage, reply *im.ReplyMessage) error {
 	contextToken := ""
 	if incoming.Extra != nil {
 		contextToken = incoming.Extra["context_token"]
 	}
 
-	// Build the send message request matching the iLink protocol
+	// Build item_list: text item first, then file items.
+	itemList := make([]map[string]interface{}, 0, 1+len(reply.Files))
+
+	if reply.Content != "" {
+		itemList = append(itemList, map[string]interface{}{
+			"type":      1, // TEXT
+			"text_item": map[string]string{"text": reply.Content},
+		})
+	}
+
+	for _, f := range reply.Files {
+		ref, err := a.UploadFile(ctx, incoming, f.FileName, f.FileData)
+		if err != nil {
+			logger.Warnf(ctx, "[WeChat] UploadFile %s failed: %v", f.FileName, err)
+			continue // skip failed files, continue with remaining
+		}
+		itemList = append(itemList, map[string]interface{}{
+			"type": 4, // FILE
+			"file_item": map[string]interface{}{
+				"cdn_media": map[string]interface{}{
+					"encrypt_query_param": ref.EncryptQueryParam,
+					"aes_key":             ref.AESKey,
+					"file_name":           ref.FileName,
+					"file_size":           ref.FileSize,
+				},
+			},
+		})
+	}
+
+	// If nothing to send, skip.
+	if len(itemList) == 0 {
+		return nil
+	}
+
 	payload := map[string]interface{}{
 		"msg": map[string]interface{}{
 			"from_user_id":  "",
@@ -107,12 +141,7 @@ func (a *Adapter) SendReply(ctx context.Context, incoming *im.IncomingMessage, r
 			"client_id":     fmt.Sprintf("weknora_%d", time.Now().UnixNano()),
 			"message_type":  2, // BOT
 			"message_state": 2, // FINISH
-			"item_list": []map[string]interface{}{
-				{
-					"type":      1, // TEXT
-					"text_item": map[string]string{"text": reply.Content},
-				},
-			},
+			"item_list":     itemList,
 			"context_token": contextToken,
 		},
 		"base_info": newBaseInfo(),

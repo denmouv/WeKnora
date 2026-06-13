@@ -1939,6 +1939,7 @@ const allTools = computed(() => [
   { value: 'list_knowledge_chunks', label: t('agentEditor.tools.listChunks'), description: t('agentEditor.tools.listChunksDesc'), group: 'rag' },
   { value: 'query_knowledge_graph', label: t('agentEditor.tools.queryGraph'), description: t('agentEditor.tools.queryGraphDesc'), group: 'rag' },
   { value: 'get_document_info', label: t('agentEditor.tools.getDocInfo'), description: t('agentEditor.tools.getDocInfoDesc'), group: 'rag' },
+  { value: 'download_document', label: t('agentEditor.tools.downloadDoc'), description: t('agentEditor.tools.downloadDocDesc'), group: 'rag' },
   { value: 'database_query', label: t('agentEditor.tools.dbQuery'), description: t('agentEditor.tools.dbQueryDesc'), group: 'rag' },
   // Wiki 读取类（阅读、搜索、标记问题）
   { value: 'wiki_search', label: t('agentEditor.tools.wikiSearch'), description: t('agentEditor.tools.wikiSearchDesc'), group: 'wiki_read' },

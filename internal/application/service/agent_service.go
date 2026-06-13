@@ -607,6 +607,8 @@ func (s *agentService) registerTools(
 			toolToRegister = tools.NewQueryKnowledgeGraphTool(s.knowledgeBaseService)
 		case tools.ToolGetDocumentInfo:
 			toolToRegister = tools.NewGetDocumentInfoTool(s.knowledgeService, s.chunkService, config.SearchTargets)
+		case tools.ToolDownloadDocument:
+			toolToRegister = tools.NewDownloadDocumentTool(s.knowledgeService, s.fileService)
 		case tools.ToolDatabaseQuery:
 			toolToRegister = tools.NewDatabaseQueryTool(s.db, config.SearchTargets)
 		case tools.ToolWebSearch:
