@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/im"
@@ -77,8 +78,19 @@ func (a *Adapter) UploadFile(
 		return nil, fmt.Errorf("get upload url: %w", err)
 	}
 
-	// 5. PUT encrypted bytes to CDN.
-	if err := a.putToCDN(ctx, uploadResp.UploadParam, encrypted); err != nil {
+	// 5. Extract encrypted_query_param from the upload URL for
+	// use in the sendmessage payload.
+	parsedURL, err := url.Parse(uploadResp.UploadFullURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse upload url: %w", err)
+	}
+	encryptQueryParam := parsedURL.Query().Get("encrypted_query_param")
+	if encryptQueryParam == "" {
+		return nil, fmt.Errorf("upload_full_url missing encrypted_query_param: %s", uploadResp.UploadFullURL)
+	}
+
+	// 6. PUT encrypted bytes to CDN.
+	if err := a.putToCDN(ctx, uploadResp.UploadFullURL, encrypted); err != nil {
 		return nil, fmt.Errorf("upload to cdn: %w", err)
 	}
 
@@ -88,7 +100,7 @@ func (a *Adapter) UploadFile(
 	return &im.UploadedFileRef{
 		FileName:          fileName,
 		FileSize:          int64(len(fileData)),
-		EncryptQueryParam: uploadResp.UploadParam,
+		EncryptQueryParam: encryptQueryParam,
 		AESKey:            base64.StdEncoding.EncodeToString(aesKey),
 	}, nil
 }
@@ -109,7 +121,7 @@ type getUploadURLRequest struct {
 }
 
 type getUploadURLResponse struct {
-	UploadParam      string `json:"upload_param"`
+	UploadFullURL    string `json:"upload_full_url"`
 	ThumbUploadParam string `json:"thumb_upload_param,omitempty"`
 }
 
@@ -143,8 +155,8 @@ func (a *Adapter) callGetUploadURL(ctx context.Context, req getUploadURLRequest)
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	if result.UploadParam == "" {
-		return nil, fmt.Errorf("empty upload_param in response: %s", string(respBody))
+	if result.UploadFullURL == "" {
+		return nil, fmt.Errorf("empty upload_full_url in response: %s", string(respBody))
 	}
 
 	return &result, nil
