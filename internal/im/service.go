@@ -1630,14 +1630,6 @@ func (s *Service) executeQARequest(req *qaRequest) {
 		answer = "抱歉，处理您的问题时出现了异常，请稍后再试。"
 	}
 
-	// The agent may not pass [FILE:...] markers through in its final
-	// answer text, so also extract them from tool messages in the
-	// conversation history.
-	toolFileMarkers := s.extractFileMarkersFromToolMessages(ctx, req.session.ID)
-	if len(toolFileMarkers) > 0 {
-		answer = answer + "\n" + strings.Join(toolFileMarkers, "\n")
-	}
-
 	// Extract file markers ([FILE:refID:filename sizeMB]) from the agent answer
 	// and resolve them to actual file bytes from the AgentFileCache.
 	files := extractFilesFromAnswer(answer)
@@ -1697,26 +1689,6 @@ func extractFilesFromAnswer(content string) []ReplyFile {
 // clean display to IM users (the actual files are sent separately).
 func stripFileMarkers(content string) string {
 	return fileMarkerPattern.ReplaceAllString(content, "")
-}
-
-// extractFileMarkersFromToolMessages scans recent session messages for
-// [FILE:...] markers produced by download_document tool results. This
-// ensures files are sent even when the agent does not pass the markers
-// through in its final answer text.
-func (s *Service) extractFileMarkersFromToolMessages(ctx context.Context, sessionID string) []string {
-	msgs, err := s.messageService.GetRecentMessagesBySession(ctx, sessionID, 20)
-	if err != nil {
-		logger.Warnf(ctx, "[IM] Failed to get recent messages for file marker extraction: %v", err)
-		return nil
-	}
-	var markers []string
-	for _, msg := range msgs {
-		if msg.Role == "tool" {
-			found := fileMarkerPattern.FindAllString(msg.Content, -1)
-			markers = append(markers, found...)
-		}
-	}
-	return markers
 }
 
 // It also handles side effects (ActionClear, ActionStop).
@@ -2586,6 +2558,27 @@ func (s *Service) runQA(ctx context.Context, session *types.Session, query strin
 		return nil
 	})
 
+	// Collect [FILE:...] markers from tool results so executeQARequest
+	// can extract and send the cached files. Session messages only
+	// include user/assistant roles — tool outputs are never persisted,
+	// so we must intercept them via the event bus during execution.
+	var fileMarkersMu sync.Mutex
+	var fileMarkers []string
+
+	eventBus.On(event.EventAgentToolResult, func(ctx context.Context, evt event.Event) error {
+		data, ok := evt.Data.(event.AgentToolResultData)
+		if !ok {
+			return nil
+		}
+		matches := fileMarkerPattern.FindAllString(data.Output, -1)
+		if len(matches) > 0 {
+			fileMarkersMu.Lock()
+			fileMarkers = append(fileMarkers, matches...)
+			fileMarkersMu.Unlock()
+		}
+		return nil
+	})
+
 	eventBus.On(event.EventError, func(ctx context.Context, evt event.Event) error {
 		data, ok := evt.Data.(event.ErrorData)
 		if !ok {
@@ -2718,6 +2711,14 @@ func (s *Service) runQA(ctx context.Context, session *types.Session, query strin
 	qaError := qaErr
 	authServices := append([]imMCPAuthService(nil), mcpAuthServices...)
 	answerMu.Unlock()
+
+	// Append FILE markers collected from tool results so that
+	// extractFilesFromAnswer() in executeQARequest can find them.
+	fileMarkersMu.Lock()
+	if len(fileMarkers) > 0 {
+		answer = answer + "\n" + strings.Join(fileMarkers, "\n")
+	}
+	fileMarkersMu.Unlock()
 
 	if answer == "" && qaError != nil {
 		return "", qaError
