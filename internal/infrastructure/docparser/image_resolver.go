@@ -614,7 +614,7 @@ const (
 	// maxRemoteImageSize is the maximum allowed size for a single remote image download.
 	maxRemoteImageSize = 10 * 1024 * 1024 // 10 MB
 	// maxRemoteImages is the maximum number of remote images to process per document.
-	maxRemoteImages = 30
+	maxRemoteImages = 60
 	// remoteImageFetchTimeout is the per-image HTTP request timeout.
 	remoteImageFetchTimeout = 15 * time.Second
 )
