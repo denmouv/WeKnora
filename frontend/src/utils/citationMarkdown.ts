@@ -183,7 +183,7 @@ export function preprocessCitationTags(
       const displayDoc = escapeHtml(truncateMiddle(doc))
       return `<span class="citation citation-kb" data-kb-id="${safeKbId}" data-chunk-id="${safeChunkId}" data-doc="${safeDoc}" role="button" tabindex="0"><span class="citation-icon citation-icon--book" aria-hidden="true"></span><span class="citation-text">${displayDoc}</span><span class="citation-tip"><span class="tip-loading">…</span></span></span>`
     })
-    .replace(/\[\[([^\]]+)\]\]/g, (match, inner: string) => {
+    .replace(/\[\[((?:[^\]]|\](?!\]))*)\]\]/g, (match, inner: string) => {
       const pipeIdx = inner.indexOf('|')
       const slug = pipeIdx > 0 ? inner.substring(0, pipeIdx).trim() : inner.trim()
       if (!slug) return match

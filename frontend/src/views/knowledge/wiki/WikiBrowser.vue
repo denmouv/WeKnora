@@ -1391,7 +1391,7 @@ watch(graphDrawerContent, async () => {
 
 function renderMarkdown(content: string): string {
   // Pre-process wiki links [[slug|name]] to custom HTML tags
-  let preprocessed = content.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
+  let preprocessed = content.replace(/\[\[((?:[^\]]|\](?!\]))*)\]\]/g, (_, inner: string) => {
     const pipeIdx = inner.indexOf('|')
     const slug = pipeIdx > 0 ? inner.substring(0, pipeIdx).trim() : inner.trim()
     const display = pipeIdx > 0 ? inner.substring(pipeIdx + 1).trim() : slugDisplayName(slug)

@@ -680,7 +680,7 @@ const wikiDrawerContent = computed(() => {
   const content = wikiDrawerPage.value.content || '';
 
   // Pre-process wiki links [[slug|name]] to custom HTML tags for the drawer
-  let preprocessed = content.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
+  let preprocessed = content.replace(/\[\[((?:[^\]]|\](?!\]))*)\]\]/g, (_, inner: string) => {
     const pipeIdx = inner.indexOf('|');
     const slug = pipeIdx > 0 ? inner.substring(0, pipeIdx).trim() : inner.trim();
     let display = slug;
