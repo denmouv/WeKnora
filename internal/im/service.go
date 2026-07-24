@@ -1633,7 +1633,6 @@ func (s *Service) executeQARequest(req *qaRequest) {
 	// Extract file markers ([FILE:refID:filename sizeMB]) from the agent answer
 	// and resolve them to actual file bytes from the AgentFileCache.
 	files := extractFilesFromAnswer(answer)
-	cleanAnswer := stripFileMarkers(answer)
 
 	reply := &ReplyMessage{
 		Content: formatIMOutboundAnswer(ctx, answer, req.tenant, s.defaultFileSvc, s.storageResolver),
